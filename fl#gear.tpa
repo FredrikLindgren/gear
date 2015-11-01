@@ -22,6 +22,68 @@
  *
  */
 
+/*********************************************************************
+ * Public interface
+ ********************************************************************/
+
+OUTER_SET fl#gear#version "1.0.0"
+
+/*
+ * Patch function operating on creatures. Gives an instance of the item
+ * to the creature, optionally equips it (boolean equip) unless the
+ * appropriate slots are already in use (boolean force).
+ */
+DEFINE_PATCH_FUNCTION fl#gear
+  INT_VAR
+    equip = 1
+    force = 0
+    flags = 0
+    charge1 = 1
+    charge2 = 0
+    charge3 = 0
+  STR_VAR
+    item = ""
+BEGIN
+
+END
+
+/*
+ * Determines if the creature can use the item.
+ * Boolean usable is true if the creature can use the item.
+ * Value available is negative if no slots are available or the number
+ * of the first available slot
+*/
+DEFINE_ACTION_FUNCTION fl#gear#usable
+  STR_VAR
+    item = ""
+    creature = ""
+  RET
+    usable
+    available
+BEGIN
+
+END
+
+/*
+ * Patch function operating on items or creatures. As the action function, except:
+ * if the current buffer is an item, creature argument must be given
+ * if the current buffer is a creature, item argument must be given
+ */
+DEFINE_PATCH_FUNCTION fl#gear#usable
+  STR_VAR
+    item = ""
+    creature = ""
+  RET
+    usable
+    available
+BEGIN
+
+END
+
+/*********************************************************************
+ * Private interface
+ ********************************************************************/
+
 DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //requires %itm_to_give%, %Charge[1-3]%, $itemexcl, $itm_rank, $cursed_item_list
   SPRINT Source_Cre "%SOURCE_RES%"
   TO_LOWER Source_Cre
