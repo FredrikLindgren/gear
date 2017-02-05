@@ -80,7 +80,11 @@ DEFINE_ACTION_FUNCTION fl#gear#usable
     usable
     available
 BEGIN
-
+  LAF fl#gear#require#itm STR_VAR item END
+  LAF fl#gear#require#cre STR_VAR creature RET creature = file END
+  COPY_EXISTING "%creature%" "override"
+    LPF fl#gear#usable STR_VAR item RET usable available END
+  END
 END
 
 /*
@@ -96,6 +100,34 @@ DEFINE_PATCH_FUNCTION fl#gear#usable
     usable
     available
 BEGIN
+  LPF fl#gear#signature RET signature END
+  PATCH_MATCH "%signature%" WITH
+    "ITM " WHEN "%creature%" STRING_EQUAL_CASE ""
+    BEGIN
+      PATCH_FAIL "ERROR: patch function fl#gear#usable must recieve creature argument when current buffer is ITM"
+    END
+
+    "CRE " WHEN "%item%" STRING_EQUAL_CASE ""
+    BEGIN
+      PATCH_FAIL "ERROR: patch function fl#gear#usable must recieve item argument when current buffer is CRE"
+    END
+
+    "ITM "
+    BEGIN
+      LPF fl#gear#require#cre STR_VAR creature END
+      LPF fl#gear#usable#itm STR_VAR creature RET usable available END
+    END
+
+    "CRE "
+    BEGIN
+      LPF fl#gear#require#itm STR_VAR item END
+      LPF fl#gear#usable#cre STR_VAR item RET usable available END
+    END
+
+    DEFAULT
+      PATCH_WARN "WARNING: patch function fl#gear#usable was called on an invalid buffer: %SOURCE_FILE%"
+  END
+END
 
 END
 
@@ -130,6 +162,108 @@ END
 /*********************************************************************
  * Private interface
  ********************************************************************/
+
+DEFINE_PATCH_FUNCTION fl#gear#signature
+  RET
+    signature
+    version
+BEGIN
+  READ_ASCII 0 signature (4) ELSE "fail"
+  READ_ASCII 4 version (4) ELSE "fail"
+END
+
+/*
+ * Checks existence of the specified item and fails if the item does not exist.
+ * The item argument may either include a file extension or omit it.
+ * String file returns the file name of the item.
+ */
+DEFINE_ACTION_FUNCTION fl#gear#require#itm
+  STR_VAR
+    item = ""
+  RET
+    file
+BEGIN
+  ACTION_IF ("%item%" STRING_MATCHES_REGEXP ".+\.itm$" = 0 AND
+             !FILE_EXISTS_IN_GAME "%item%") OR
+            (!"%item%" STRING_MATCHES_REGEXP ".+\.itm$" = 0 AND
+             !FILE_EXISTS_IN_GAME "%item%.itm")
+  BEGIN
+    FAIL "ERROR: fl#gear cannot work with non-existent item %item%"
+  END
+  ACTION_IF "%item%" STRING_MATCHES_REGEXP ".+\.itm$" = 0 BEGIN
+    OUTER_SPRINT file "%item%"
+  END ELSE OUTER_SPRINT file "%item%.itm"
+END
+
+/*
+ * Checks the existence of the specified creature and fails if the creature
+ * does not exist. The creature argument may either include a file extension
+ * or omit it.
+ * String file returns the file name of the item.
+ */
+DEFINE_ACTION_FUNCTION fl#gear#require#cre
+  STR_VAR
+    creature = ""
+  RET
+    file
+BEGIN
+  ACTION_IF ("%creature%" STRING_MATCHES_REGEXP ".+\.cre$" = 0 AND
+             !FILE_EXISTS_IN_GAME "%creature%") OR
+            (!"%creature%" STRING_MATCHES_REGEXP ".+\.cre$" = 0 AND
+             !FILE_EXISTS_IN_GAME "%creature%.cre")
+  BEGIN
+    FAIL "ERROR: fl#gear cannot work with non-existent creature %creature%"
+  END
+  ACTION_IF "%creature%" STRING_MATCHES_REGEXP ".+\.cre$" = 0 BEGIN
+    OUTER_SPRINT file "%creature%"
+  END ELSE OUTER_SPRINT file "%creature%.cre"
+END
+
+DEFINE_PATCH_FUNCTION fl#gear#require#itm
+  STR_VAR
+    item = ""
+BEGIN
+  INNER_ACTION BEGIN
+    LAF fl#gear#require#itm STR_VAR item END
+  END
+END
+
+DEFINE_PATCH_FUNCTION fl#gear#require#cre
+  STR_VAR
+    creature = ""
+BEGIN
+  INNER_ACTION BEGIN
+    LAF fl#gear#require#cre STR_VAR creature END
+  END
+END
+
+/*
+ * Determines if the specified creature can use the item given by the current
+ * buffer. The current buffer obviously needs to be a valid item.
+ */
+DEFINE_PATCH_FUNCTION fl#gear#usable#itm
+  STR_VAR
+    creature = ""
+  RET
+    usable
+    available
+BEGIN
+
+END
+
+/*
+ * Determines if the specified item can be used by the creature given by the
+ * current buffer. The current buffer obviously needs to be a valid creature.
+ */
+DEFINE_PATCH_FUNCTION fl#gear#usable#cre
+  STR_VAR
+    item = ""
+  RET
+    usable
+    available
+BEGIN
+
+END
 
 DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //requires %itm_to_give%, %Charge[1-3]%, $itemexcl, $itm_rank, $cursed_item_list
   SPRINT Source_Cre "%SOURCE_RES%"
