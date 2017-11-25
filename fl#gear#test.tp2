@@ -1,0 +1,243 @@
+BACKUP "fl#gear#test/backup"
+AUTHOR Wisp
+
+ALWAYS
+  INCLUDE ~fl#gear.tpa~
+  INCLUDE ~%MOD_FOLDER%/lib.tpa~
+
+  // Environment that should be refactored away
+  OUTER_SPRINT fl#gear#dir "."
+  OUTER_SET BG1 = 0
+  OUTER_SET Tutu = 0
+  OUTER_SET BGT = 0
+END
+
+BEGIN ~fl#gear test battery~
+NO_LOG_RECORD
+
+/* Abide by restrictions on class, alignment, race, kit */
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "mage item, fighter cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = staf11 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "good item, evil cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = sw2h10 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "dwarf item, human cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = hamm06 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "armour, kensai cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = plat01 cre = abazigal END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "mage weapon, mage cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = staf11 cre = hlsion END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "carsomyr, good paladin"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = sw2h10 cre = alar END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "dwarf weapon, dwarf fighter"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = hamm06 cre = d1mothdw END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "not equip cursed items"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = plat17 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "not equip disabling armor on mages"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = chan03 cre = amarch01 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "not equip disabling armor on rogues"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = chan03 cre = korscroo END
+END
+
+
+/* Different kinds of items */
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "shield, fighter cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = shld01 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "two-handed weapon, fighter cre"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = sw2h01 cre = hlrevan END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "launcher, fighter cre, no ammo"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = slng01 cre = hlrevan END
+END
+
+
+/* Interactions with existing gear */
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "new, better, single-handed melee weapon"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test STR_VAR testid item = blun14 cre = obshal02 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "new, worse, single-handed melee weapon"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      notselected
+  END
+  LAF fl#gear#test STR_VAR testid item = dagg01 cre = obshal03 END
+END
+
+/*
+ * Giving a launcher of a different type to a creature with a
+ * launcher and ammunition equipped without forcing
+ * Expected result: item is placed in inventory and not equipped
+ */
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "can equip different types of launchers"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = slng01 cre = obshal02 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "cannot equip same types of launchers"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = bow10 cre = obshal02 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "robe and bracer, no exclusion"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = clck12 cre = pbhunt03 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "cloak and bracer, exclusion"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = clck01 cre = pbhunt03 END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "two-handed weapon and shield, unforced"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = sw2h02 cre = korscroo END
+END
+
+/* // Not yet implemented
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "two-handed weapon and shield, forced"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+                      selected
+  END
+  LAF fl#gear#test INT_VAR force = 1 STR_VAR testid item = sw2h02 cre = korscroo END
+END
+*/
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "can equip slings with shields"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = slng01 cre = korscroo END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "do not equip new shields with two-handed weapons"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = shld01 cre = abazigal END
+END

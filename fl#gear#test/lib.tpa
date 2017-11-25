@@ -1,0 +1,163 @@
+/* Run test */
+DEFINE_ACTION_FUNCTION fl#gear#test
+  INT_VAR
+    equip = 1
+    flags = 0
+    force = 0
+    charge1 = 1
+    charge2 = 0
+    charge3 = 0
+  STR_VAR
+    testid = ""
+    item = ""
+    cre = ""
+BEGIN
+  PRINT "Running test %testid%"
+  COPY - "%MOD_FOLDER%/objects/cre/%cre%.cre"
+         ".../fl#gear#test/inlined/%cre%.cre"
+    LPF fl#gear
+      INT_VAR
+        equip
+        flags
+        force
+        charge1
+        charge2
+        charge3
+      STR_VAR
+        item
+      END
+    LPF fl#gear#test#predicates STR_VAR testid item RET failure END
+  BUT_ONLY
+
+  ACTION_IF failure BEGIN
+    LAF fl#gear#test#save_object
+      STR_VAR
+        object = EVAL ".../fl#gear#test/inlined/%cre%.cre"
+        dest = EVAL "%cre%.cre"
+    END
+  END
+END
+
+/* Test predicates */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicates
+  STR_VAR
+    testid = ""
+    item = ""
+  RET
+    failure
+BEGIN
+  failure = 0
+  PHP_EACH predicates AS _ => predicate BEGIN
+    LPF "fl#gear#test#predicate#%predicate%" STR_VAR item RET true END
+    PATCH_IF !true BEGIN
+      PATCH_WARN "WARNING: predicate %predicate% failed for test %testid%"
+      failure = 1
+    END
+  END
+END
+
+DEFINE_ACTION_FUNCTION fl#gear#test#save_object
+  STR_VAR
+    object = ""
+    dest = ""
+BEGIN
+  MKDIR "%MOD_FOLDER%/objects/saved"
+  GET_DIRECTORY_ARRAY saved "%MOD_FOLDER%/objects/saved" ".+"
+  OUTER_SET count = 0
+  ACTION_PHP_EACH saved AS _ => dir BEGIN
+    ACTION_IF "%dir%" STR_CMP "%MOD_FOLDER%/objects/saved/." AND
+              "%dir%" STR_CMP "%MOD_FOLDER%/objects/saved/.."
+    BEGIN
+      OUTER_SET ++count
+    END
+  END
+  MKDIR "%MOD_FOLDER%/objects/saved/%count%"
+  OUTER_SPRINT dest_dir "%MOD_FOLDER%/objects/saved/%count%/%dest%"
+  COPY "%object%" "%dest_dir%"
+  PRINT "Saved object to %dest_dir%"
+END
+
+/* Searches the slot range for the specified item */
+DEFINE_PATCH_FUNCTION fl#gear#test#find_item
+  INT_VAR
+    low_slot = 0
+    high_slot = 37
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  true = 0
+  READ_LONG 0x2b8 iso
+  READ_LONG 0x2bc io
+  FOR (i = low_slot; i < high_slot; ++i) BEGIN
+    READ_SSHORT iso + 0x2 * i ref
+    PATCH_IF ref >= 0 BEGIN
+      READ_ASCII io + ref * 0x14 value
+      PATCH_IF "%value%" STR_EQ "%item%" BEGIN
+        true = 1
+        i = high_slot
+      END
+    END
+  END
+END
+
+/* Test for whether the creature possesses the item */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicate#present
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  LPF fl#gear#test#find_item STR_VAR item RET true END
+END
+
+/* Test for whether the creature has the item equipped */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicate#equipped
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  LPF fl#gear#test#find_item INT_VAR high_slot = 17 STR_VAR item RET true END
+END
+
+/* Inverse test for whether the creature has the item equipped */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicate#notequipped
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  LPF fl#gear#test#predicate#equipped STR_VAR item RET true END
+  SET true = NOT true
+END
+
+/* Test for whether the creature has the weapon selected */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicate#selected
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  true = 0
+  READ_LONG 0x2b8 iso
+  READ_LONG 0x2bc io
+  READ_SSHORT iso + 0x2 * 38 selected
+  READ_SSHORT iso + 0x2 * 9 + 0x2 * selected ref
+  READ_ASCII io + ref * 0x14 value
+  PATCH_IF "%value%" STR_EQ "%item%" BEGIN
+    true = 1
+  END
+END
+
+/* Inverse test for whether the creature has the weapon selected */
+DEFINE_PATCH_FUNCTION fl#gear#test#predicate#notselected
+  STR_VAR
+    item = ""
+  RET
+    true
+BEGIN
+  LPF fl#gear#test#predicate#selected STR_VAR item RET true END
+  SET true = NOT true
+END
