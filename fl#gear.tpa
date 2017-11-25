@@ -26,7 +26,7 @@
  * Public interface
  ********************************************************************/
 
-OUTER_SET fl#gear#version "1.0.0"
+OUTER_SPRINT fl#gear#version "1.0.0"
 
 /*
  * Gives the specified item to the specified creature, optionally
@@ -45,7 +45,18 @@ DEFINE_ACTION_FUNCTION fl#gear
     item = ""
     creature = ""
 BEGIN
-
+  COPY_EXISTING "%creature%.cre" override
+    LPF fl#gear
+      INT_VAR
+        equip
+        force
+        flags
+        charge1
+        charge2
+        charge3
+      STR_VAR
+        item
+    END
 END
 
 /*
@@ -63,7 +74,21 @@ DEFINE_PATCH_FUNCTION fl#gear
   STR_VAR
     item = ""
 BEGIN
-
+  INNER_ACTION BEGIN
+    LAM fl#gear#setup#array#itemexcl
+    LAM fl#gear#setup#array#itemrank
+    LAM fl#gear#setup#array#cursed
+  END
+  LPF give_itm_to_cre
+    INT_VAR
+      f_Equip = equip
+      f_Flags = flags
+      Charge1 = charge1
+      Charge2 = charge2
+      Charge3 = charge3
+    STR_VAR
+      itm_to_give = EVAL "%item%"
+  END
 END
 
 /*
@@ -84,7 +109,7 @@ BEGIN
   LAF fl#gear#require#cre STR_VAR creature RET creature = file END
   COPY_EXISTING "%creature%" "override"
     LPF fl#gear#usable STR_VAR item RET usable available END
-  END
+  BUT_ONLY
 END
 
 /*
@@ -129,8 +154,6 @@ BEGIN
   END
 END
 
-END
-
 /*
  * Attempts to equip the specified creature with the specified item in an
  * optimised fashion, considering skill, class and kit, available item slots,
@@ -159,17 +182,65 @@ BEGIN
 
 END
 
+/*
+ * Setup macro to create the item-exclusion array
+ */
+DEFINE_ACTION_MACRO fl#gear#setup#array#itemexcl BEGIN
+  LOCAL_SPRINT SOURCE_DIRECTORY ""
+  LOCAL_SPRINT SOURCE_FILESPEC ""
+  LOCAL_SPRINT SOURCE_FILE ""
+  LOCAL_SPRINT SOURCE_RES ""
+  LOCAL_SPRINT SOURCE_EXT ""
+  LOCAL_SPRINT DEST_DIRECTORY ""
+  LOCAL_SPRINT DEST_FILESPEC ""
+  LOCAL_SPRINT DEST_FILE ""
+  LOCAL_SPRINT DEST_RES ""
+  LOCAL_SPRINT DEST_EXT ""
+  LOCAL_SPRINT item ""
+  LOCAL_SET SOURCE_SIZE = 0
+  LOCAL_SET i = 0
+  COPY_EXISTING itemexcl.2da override
+    READ_2DA_ENTRIES_NOW fl#gear#2da#read#itemexcl 2
+    FOR (i = 1; i < fl#gear#2da#read#itemexcl; ++i) BEGIN
+      READ_2DA_ENTRY_FORMER fl#gear#2da#read#itemexcl i 0 item
+      TO_LOWER item
+      SET $fl#gear#itemexcl("%item%") = 1
+    END
+  BUT_ONLY
+  OUTER_SET fl#gear#setup#array#itemexcl = 1
+END
+
+/*
+ * Setup macro to create the item-rank array
+ */
+DEFINE_ACTION_MACRO fl#gear#setup#array#itemrank BEGIN
+  INCLUDE "%fl#gear#dir%/fl#gear#itemrank.tpa" // tmp
+  OUTER_SET fl#gear#setup#array#itemrank = 1
+END
+
+/*
+ * Setup macro to create the cursed-item array
+ */
+DEFINE_ACTION_MACRO fl#gear#setup#array#cursed BEGIN
+  INCLUDE "%fl#gear#dir%/fl#gear#cursed.tpa" // tmp
+  OUTER_SET fl#gear#setup#array#cursed = 1
+END
+
 /*********************************************************************
  * Private interface
  ********************************************************************/
+
+OUTER_SET fl#gear#setup#array#itemexcl = 0
+OUTER_SET fl#gear#setup#array#itemrank = 0
+OUTER_SET fl#gear#setup#array#cursed = 0
 
 DEFINE_PATCH_FUNCTION fl#gear#signature
   RET
     signature
     version
 BEGIN
-  READ_ASCII 0 signature (4) ELSE "fail"
-  READ_ASCII 4 version (4) ELSE "fail"
+  READ_ASCII 0 signature ELSE "fail" (4)
+  READ_ASCII 4 version ELSE "fail" (4)
 END
 
 /*
@@ -308,7 +379,7 @@ DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //re
         END
       BUT_ONLY
     END
-    add_itm = (riu_itm_flags1 BAND 16) = 0 AND !VARIABLE_IS_SET $cursed_item_list("%itm_to_give%") ? 1 : 0 //Not cursed
+    add_itm = (riu_itm_flags1 BAND 16) = 0 AND !VARIABLE_IS_SET $fl#gear#cursed("%itm_to_give%") ? 1 : 0 //Not cursed
     two_handed = (riu_itm_flags1 BAND 130) = 0 ? 0 : 1 //Two-handed or bow
     FOR (i=0;i<37;i+=1) BEGIN
       READ_SSHORT itm_slt + 0x2*i ref ELSE "-2"
@@ -361,9 +432,9 @@ DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //re
       no_add = 0
       FOR (i=lower_bound;i<upper_bound;i+=1) BEGIN
         PATCH_IF $ref("%i%") = "-1" BEGIN
-          PATCH_IF VARIABLE_IS_SET $itemexcl("%itm_to_give%") BEGIN
+          PATCH_IF VARIABLE_IS_SET $fl#gear#itemexcl("%itm_to_give%") BEGIN
             FOR (j=0;j<21;j+=1) BEGIN
-              no_add = VARIABLE_IS_SET $itemexcl($items("%j%")) ? 1 : no_add
+              no_add = VARIABLE_IS_SET $fl#gear#itemexcl($items("%j%")) ? 1 : no_add
             END
           END
           PATCH_IF launcher = 1 BEGIN //Do not equip two launchers of the same type
@@ -445,9 +516,9 @@ DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //re
       PATCH_IF added = 0 AND lower_bound < 21 BEGIN //If we couldn't just add the item, try to swap it in
         FOR (i=lower_bound;i<upper_bound;i+=1) BEGIN
           no_swap = 0
-          PATCH_IF VARIABLE_IS_SET $itemexcl("%itm_to_give%") BEGIN //Do not swap in a itemexcl item if there is another itemexcl item equipped, unless we are swapping out the other item
+          PATCH_IF VARIABLE_IS_SET $fl#gear#itemexcl("%itm_to_give%") BEGIN //Do not swap in a itemexcl item if there is another itemexcl item equipped, unless we are swapping out the other item
             FOR (j=0;j<21;j+=1) BEGIN
-              no_swap = VARIABLE_IS_SET $itemexcl($item("%j%")) AND j != i ? 1 : no_swap
+              no_swap = VARIABLE_IS_SET $fl#gear#itemexcl($item("%j%")) AND j != i ? 1 : no_swap
             END
           END
           SPRINT item $items("%i%")
@@ -463,11 +534,11 @@ DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //re
             ranged_new = new_prof = 104 OR new_prof = 105 OR new_prof = 15 OR (new_prof = 89 AND BG1_STYLE_PROFS = 1) ? 1 : new_prof = 103 OR new_prof = 27 OR (new_prof = 95 AND new_cat = 27 AND BG1_STYLE_PROFS = 1) ? 2 : new_prof = 107 OR new_prof = 18 OR (new_prof = 95 AND new_cat = 18 AND BG1_STYLE_PROFS = 1) ? 3 : 0 //i=bow, 2=xbow, 3=sling, 0=other
             ranged_old = old_prof = 104 OR old_prof = 105 OR old_prof = 15 OR (old_prof = 89 AND BG1_STYLE_PROFS = 1) ? 1 : old_prof = 103 OR old_prof = 27 OR (old_prof = 95 AND old_cat = 27 AND BG1_STYLE_PROFS = 1) ? 2 : old_prof = 107 OR old_prof = 18 OR (old_prof = 95 AND old_cat = 18 AND BG1_STYLE_PROFS = 1) ? 3 : 0
             no_swap = ranged_new = ranged_old ? no_swap : 1
-            no_swap = (flags5 BAND 64) = 64 AND !VARIABLE_IS_SET $itm_rank("%item%") ? 1 : no_swap //Do not swap out unranked magical items
-            PATCH_IF VARIABLE_IS_SET $itm_rank("%itm_to_give%") AND VARIABLE_IS_SET $itm_rank("%item%") BEGIN //Do not swap out better items
-              no_swap = $itm_rank("%itm_to_give%") < $itm_rank("%item%") AND lower_bound != 9 ? 1 : no_swap
+            no_swap = (flags5 BAND 64) = 64 AND !VARIABLE_IS_SET $fl#gear#itemrank("%item%") ? 1 : no_swap //Do not swap out unranked magical items
+            PATCH_IF VARIABLE_IS_SET $fl#gear#itemrank("%itm_to_give%") AND VARIABLE_IS_SET $fl#gear#itemrank("%item%") BEGIN //Do not swap out better items
+              no_swap = $fl#gear#itemrank("%itm_to_give%") < $fl#gear#itemrank("%item%") AND lower_bound != 9 ? 1 : no_swap
               PATCH_IF lower_bound = 9 BEGIN
-                no_swap = ($itm_rank("%itm_to_give%") + (3/2)*$rcp_prof("%new_prof%")) <= ($itm_rank("%item%") + (3/2)*$rcp_prof("%old_prof%")) ? 1 : no_swap
+                no_swap = ($fl#gear#itemrank("%itm_to_give%") + (3/2)*$rcp_prof("%new_prof%")) <= ($fl#gear#itemrank("%item%") + (3/2)*$rcp_prof("%old_prof%")) ? 1 : no_swap
               END
             END
             PATCH_IF (flags5 BAND 4) = 4 AND (cre_itm_flags1 BAND 10) = 0 AND no_swap = 0 BEGIN //If the item is not undroppable and hasn't been disallowed for swapping
@@ -538,22 +609,22 @@ DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //re
                 BUT_ONLY
               END
               TO_LOWER item
-              PATCH_IF (cre_flags2 BAND 8) = 8 OR (flags2 BAND 4) = 0 OR (!VARIABLE_IS_SET $itm_rank("%item%") AND (flags2 BAND 64) = 64) BEGIN
+              PATCH_IF (cre_flags2 BAND 8) = 8 OR (flags2 BAND 4) = 0 OR (!VARIABLE_IS_SET $fl#gear#itemrank("%item%") AND (flags2 BAND 64) = 64) BEGIN
                 i = upper_bound
                 write_ref = weapon_ref
-              END ELSE PATCH_IF VARIABLE_IS_SET $itm_rank("%item%") BEGIN
-                write_ref = highest < $itm_rank("%item%")*(3/2)*$rcp_prof("%prof%")
+              END ELSE PATCH_IF VARIABLE_IS_SET $fl#gear#itemrank("%item%") BEGIN
+                write_ref = highest < $fl#gear#itemrank("%item%")*(3/2)*$rcp_prof("%prof%")
                 AND (prof != 103 AND prof != 27 AND !(prof = 95 AND BG1_STYLE_PROFS) OR ((prof = 103 OR prof = 27 OR (prof = 95 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2)) //Only select a ranged weapon if it's the best weapon you have and if your prof is >2
                 AND (prof != 104 AND prof != 15 AND !(prof = 89 AND BG1_STYLE_PROFS) OR ((prof = 104 OR prof = 15 OR (prof = 89 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 AND (prof != 105 AND prof != 15 AND !(prof = 89 AND BG1_STYLE_PROFS) OR ((prof = 105 OR prof = 15 OR (prof = 89 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 AND (prof != 107 AND prof != 18 AND !(prof = 95 AND BG1_STYLE_PROFS) OR ((prof = 107 OR prof = 18 OR (prof = 95 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 ? weapon_ref : write_ref
-                highest = highest < $itm_rank("%item%")*(3/2)*$rcp_prof("%prof%")
+                highest = highest < $fl#gear#itemrank("%item%")*(3/2)*$rcp_prof("%prof%")
                 AND (prof != 103 AND prof != 27 AND !(prof = 95 AND BG1_STYLE_PROFS) OR ((prof = 103 OR prof = 27 OR (prof = 95 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 AND (prof != 104 AND prof != 15 AND !(prof = 89 AND BG1_STYLE_PROFS) OR ((prof = 104 OR prof = 15 OR (prof = 89 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 AND (prof != 105 AND prof != 15 AND !(prof = 89 AND BG1_STYLE_PROFS) OR ((prof = 105 OR prof = 15 OR (prof = 89 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2))
                 AND (prof != 107 AND prof != 18 AND !(prof = 95 AND BG1_STYLE_PROFS) OR ((prof = 107 OR prof = 18 OR (prof = 95 AND BG1_STYLE_PROFS)) AND $rcp_prof("%prof%") > 2)) //!(prof != 95 AND cat = 18 AND !BG1_STYLE_PROFS)
-                ? $itm_rank("%item%")*(3/2)*$rcp_prof("%prof%") : highest
+                ? $fl#gear#itemrank("%item%")*(3/2)*$rcp_prof("%prof%") : highest
               END
             END
           END
