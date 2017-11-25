@@ -4,15 +4,9 @@ ACTION_DEFINE_ASSOCIATIVE_ARRAY fl#gear#cursed BEGIN
   brac08 => 1
   brac11 => 1
   boot08 => 1
-  clck27 => 1
-  clck17 => 1
-  dagg17 => 1
   helm02 => 1
   misc72 => 1
   leat06 => 1
-  leat13 => 1
-  leat16 => 1
-  leat18 => 1
   plat17 => 1
   ring04 => 1
   ring23 => 1
