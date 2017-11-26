@@ -11,10 +11,17 @@ DEFINE_ACTION_FUNCTION fl#gear#test
     testid = ""
     item = ""
     cre = ""
+    source = ""
 BEGIN
   PRINT "Running test %testid%"
-  COPY - "%MOD_FOLDER%/objects/cre/%cre%.cre"
-         ".../fl#gear#test/inlined/%cre%.cre"
+  ACTION_IF "%source%" STR_CMP "" BEGIN
+    OUTER_SPRINT srcfile "%source%"
+  END ELSE BEGIN
+    OUTER_SPRINT srcfile "%MOD_FOLDER%/objects/cre/%cre%.cre"
+  END
+  OUTER_SPRINT dstfile ".../fl#gear#test/inlined/test_object/%cre%.cre"
+  COPY - "%srcfile%"
+         "%dstfile%"
     LPF fl#gear
       INT_VAR
         equip
@@ -32,7 +39,7 @@ BEGIN
   ACTION_IF failure BEGIN
     LAF fl#gear#test#save_object
       STR_VAR
-        object = EVAL ".../fl#gear#test/inlined/%cre%.cre"
+        object = EVAL "%dstfile%"
         dest = EVAL "%cre%.cre"
     END
   END
