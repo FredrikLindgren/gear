@@ -162,11 +162,6 @@ WITH_SCOPE BEGIN
   LAF fl#gear#test STR_VAR testid item = dagg01 cre = obshal03 END
 END
 
-/*
- * Giving a launcher of a different type to a creature with a
- * launcher and ammunition equipped without forcing
- * Expected result: item is placed in inventory and not equipped
- */
 WITH_SCOPE BEGIN
   OUTER_SPRINT testid "can equip different types of launchers"
   ACTION_DEFINE_ARRAY predicates BEGIN
