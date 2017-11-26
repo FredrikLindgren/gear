@@ -105,7 +105,7 @@ DEFINE_ACTION_FUNCTION fl#gear#usable
     usable
     available
 BEGIN
-  LAF fl#gear#require#itm STR_VAR item END
+  LAF fl#gear#require#itm STR_VAR item RET item = file END
   LAF fl#gear#require#cre STR_VAR creature RET creature = file END
   COPY_EXISTING "%creature%" "override"
     LPF fl#gear#usable STR_VAR item RET usable available END
@@ -139,13 +139,13 @@ BEGIN
 
     "ITM "
     BEGIN
-      LPF fl#gear#require#cre STR_VAR creature END
+      LPF fl#gear#require#cre STR_VAR creature RET creature = file END
       LPF fl#gear#usable#itm STR_VAR creature RET usable available END
     END
 
     "CRE "
     BEGIN
-      LPF fl#gear#require#itm STR_VAR item END
+      LPF fl#gear#require#itm STR_VAR item RET item = file END
       LPF fl#gear#usable#cre STR_VAR item RET usable available END
     END
 
@@ -270,7 +270,7 @@ END
  * Checks the existence of the specified creature and fails if the creature
  * does not exist. The creature argument may either include a file extension
  * or omit it.
- * String file returns the file name of the item.
+ * String file returns the file name of the creature.
  */
 DEFINE_ACTION_FUNCTION fl#gear#require#cre
   STR_VAR
@@ -293,19 +293,76 @@ END
 DEFINE_PATCH_FUNCTION fl#gear#require#itm
   STR_VAR
     item = ""
+  RET
+    file
 BEGIN
   INNER_ACTION BEGIN
-    LAF fl#gear#require#itm STR_VAR item END
+    LAF fl#gear#require#itm STR_VAR item RET file END
   END
 END
 
 DEFINE_PATCH_FUNCTION fl#gear#require#cre
   STR_VAR
     creature = ""
+  RET
+    file
 BEGIN
   INNER_ACTION BEGIN
-    LAF fl#gear#require#cre STR_VAR creature END
+    LAF fl#gear#require#cre STR_VAR creature RET file END
   END
+END
+
+/*
+ * Returns the slot range of the item, based on either the specified
+ * category or the category read from the current buffer
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#slot_range
+  INT_VAR
+    category = "-1"
+  RET
+    lower
+    upper
+BEGIN
+  PATCH_IF category < 0 BEGIN
+    READ_SHORT 0x1c category
+  END
+  lower = category = 1 ? 6 : category = 2 ? 1 : category = 3 ? 7 :
+          category = 4 ? 8 : category = 6 ? 3 : category = 7 ? 0 :
+          category = 10 ? 4 : category = 12 ? 2 :
+          category = 15 OR category = 27 OR category = 25 OR
+          category = 17 OR category = 23 OR category = 22 OR
+          category = 16 OR category = 30 OR category = 26 OR
+          category = 19 OR category = 20 OR category = 21 OR
+          category = 18 OR category = 29 ? 9 : category = 32 ? 17 :
+          category = 35 ? 18 : 21
+  upper = category = 1 ? 7 : category = 2 ? 2 : category = 3 ? 8 :
+          category = 4 ? 9 : category = 6 ? 4 : category = 7 ? 1 :
+          category = 10 ? 6 : category = 12 ? 3 :
+          category = 15 OR category = 27 OR category = 25 OR
+          category = 17 OR category = 23 OR category = 22 OR
+          category = 16 OR category = 30 OR category = 26 OR
+          category = 19 OR category = 20 OR category = 21 OR
+          category = 18 OR category = 29 ? 13 :
+          category = 32 ? 18 : category = 35 ? 21 : 37
+END
+
+/*
+ * Returns the items unusability bytes as two DWORDs
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#unuse
+  RET
+    main
+    kit
+BEGIN
+  READ_LONG 0x1e main
+  READ_BYTE 0x29 kit1
+  READ_BYTE 0x2b kit2
+  READ_BYTE 0x2d kit3
+  READ_BYTE 0x2f kit4
+  kit2 <<= 8
+  kit3 <<= 16
+  kit4 <<= 24
+  kit = kit1 + kit2 + kit3 + kit4
 END
 
 /*
@@ -319,7 +376,120 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#itm
     usable
     available
 BEGIN
+ // category of item
+ // unusabilities of item
+ // flags of item
+ // determine slot range of item
+ // proficiency of item
 
+ // unusabilities of creature
+ // proficiencies of creature
+END
+
+/*
+ * Returns unusability bytes for the creature in the form of two DWORDs
+ * Can be compared to the DWORDs read from items (1 means the creature is,
+ * 0 means the creature ain't)
+ */
+DEFINE_PATCH_FUNCTION fl#gear#cre#unuse
+  RET
+    main
+    kit
+BEGIN
+  READ_LONG 0x244 kitvalue
+  READ_BYTE 0x272 race
+  READ_BYTE 0x273 class
+  READ_BYTE 0x27b alignment
+  main1 = 0 main2 = 0 main3 = 0 main4 = 0
+  kit1 = 0 kit2 = 0 kit3 = 0 kit4 = 0a
+  main1 = alignment = 17 ? 0b00010100 : // LAWFUL_GOOD
+          alignment = 33 ? 0b00100100 : // NEUTRAL_GOOD
+          alignment = 49 ? 0b00000101 : // CHAOTIC_GOOD
+          alignment = 18 ? 0b00011000 : // LAWFUL_NEUTRAL
+          alignment = 34 ? 0b00101000 : // NEUTRAL
+          alignment = 50 ? 0b00001001 : // CHAOTIC_NEUTRAL
+          alignment = 19 ? 0b00010010 : // LAWFUL_EVIL
+          alignment = 35 ? 0b00100010 : // NEUTRAL_EVIL
+          alignment = 51 ? 0b00000011 : // CHAOTIC_EVIL
+          main1
+  main1 = class = 5 ? main1 BOR 0b01000000 : // BARD
+          class = 3 ? main1 BOR 0b10000000 : // CLERIC
+          main1
+  main2 = class = 17 ? 0b10000000 : // FIGHTER_MAGE_CLERIC
+          class = 8  ? 0b01000000 : // FIGHTER_CLERIC
+          class = 7  ? 0b00100000 : // FIGHTER_MAGE
+          class = 16 ? 0b00010000 : // FIGHTER_DRUID
+          class = 2  ? 0b00001000 : // FIGHTER
+          class = 18 ? 0b00000100 : // CLERIC_RANGER
+          class = 15 ? 0b00000010 : // CLERIC_THIEF
+          class = 14 ? 0b00000001 : // CLERIC_MAGE
+          main2
+  main3 = class = 10 ? 0b00000001 : // FIGTHER_MAGE_THIEF
+          class = 9  ? 0b00000010 : // FIGHTER_THIEF
+          class = 1  ? 0b00000100 : // MAGE
+          class = 13 ? 0b00001000 : // MAGE_THIEF
+          class = 6  ? 0b00010000 : // PALADIN
+          class = 12 ? 0b00100000 : // RANGER
+          class = 4  ? 0b01000000 : // THIEF
+          main3
+  main3 = race = 2 ? main3 BOR 0b10000000 : // ELF
+          main3
+  main4 = race = 4 ? 0b00000001 : // DWARF
+          race = 3 ? 0b00000010 : // HALF_ELF
+          race = 5 ? 0b00000100 : // HALFLING
+          race = 1 ? 0b00001000 : // HUMAN
+          race = 6 ? 0b00010000 : // GNOME
+          race = 7 ? 0b10000000 : // HALFORC
+          main4
+  main4 = class = 20 ? main4 BOR 0b00100000 : // MONK
+          class = 11 ? main4 BOR 0b01000000 : // DRUID
+          main4
+  kit1 = kitvalue = 0x40130000 ? 0b00000001 : // TALOS
+         kitvalue = 0x40140000 ? 0b00000010 : // HELM
+         kitvalue = 0x40150000 ? 0b00000100 : // LATHANDER
+         kitvalue = 0x40100000 ? 0b00001000 : // TOTEMIC
+         kitvalue = 0x40110000 ? 0b00010000 : // SHAPESHIFTER
+         kitvalue = 0x40120000 ? 0b00100000 : // AVENGER
+         kitvalue = 0x00004000 ? 0b01000000 : // BARBARIAN
+         kitvalue = 0x00008000 ? 0b10000000 : // WILDMAGE
+         kit1
+  kit2 = kitvalue = 0x40080000 ? 0b00000001 : // STALKER
+         kitvalue = 0x40090000 ? 0b00000010 : // BEASTMASTER
+         kitvalue = 0x400a0000 ? 0b00000100 : // ASSASSIN
+         kitvalue = 0x400b0000 ? 0b00001000 : // BOUNTYHUNTER
+         kitvalue = 0x400c0000 ? 0b00010000 : // SWASHBUCKLER
+         kitvalue = 0x400d0000 ? 0b00100000 : // BLADE
+         kitvalue = 0x400e0000 ? 0b01000000 : // JESTER
+         kitvalue = 0x400f0000 ? 0b10000000 : // SKALD
+         kit2
+  kit3 = kitvalue = 0x01000000 ? 0b00000001 : // DIVINER
+         kitvalue = 0x02000000 ? 0b00000010 : // ENCHANTER
+         kitvalue = 0x04000000 ? 0b00000100 : // ILLUSIONIST
+         kitvalue = 0x08000000 ? 0b00001000 : // INVOKER
+         kitvalue = 0x10000000 ? 0b00010000 : // NECROMANCER
+         kitvalue = 0x20000000 ? 0b00100000 : // TRANSMUTER
+         kitvalue = 0x40070000 ? 0b10000000 : // ARCHER
+         kit3
+         /* No kit or trueclass/generalist */
+  kit3 = kitvalue = 0 OR kitvalue = 0x40000000 ? kit3 BOR 0b01000000 :
+         kit3
+  kit4 = kitvalue = 0x40010000 ? 0b00000001 : // BERSERKER
+         kitvalue = 0x40020000 ? 0b00000010 : // KENSAI
+         kitvalue = 0x40030000 ? 0b00000100 : // WIZARDSLAYER
+         kitvalue = 0x40040000 ? 0b00001000 : // CAVALIER
+         kitvalue = 0x40050000 ? 0b00010000 : // INQUISITOR
+         kitvalue = 0x40060000 ? 0b00100000 : // UNDEADHUNTER
+         kitvalue = 0x00400000 ? 0b01000000 : // ABJURER
+         kitvalue = 0x00800000 ? 0b10000000 : // CONJURER
+         kit4
+  main2 <<= 8
+  main3 <<= 16
+  main4 <<= 24
+  kit2 <<= 8
+  kit3 <<= 16
+  kit4 <<= 24
+  main = main1 + main2 + main3 + main4
+  kit = main1 + main2 + main3 + main4
 END
 
 /*
