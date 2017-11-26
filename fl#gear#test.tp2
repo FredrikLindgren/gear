@@ -204,6 +204,26 @@ WITH_SCOPE BEGIN
 END
 
 WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "can swap out exclusion item for better of same type"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = brac02 cre = pbhunt03 END
+END
+
+/* // Not implemented yet (how is this supposed to work?)
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "can de-equip exclusion item of different type for better"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      equipped
+  END
+  LAF fl#gear#test STR_VAR testid item = clck02 cre = pbhunt03 END
+END
+*/
+
+WITH_SCOPE BEGIN
   OUTER_SPRINT testid "two-handed weapon and shield, unforced"
   ACTION_DEFINE_ARRAY predicates BEGIN
                       present
@@ -223,6 +243,15 @@ WITH_SCOPE BEGIN
   LAF fl#gear#test INT_VAR force = 1 STR_VAR testid item = sw2h02 cre = korscroo END
 END
 */
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "two-handed launcher and shield, unforced"
+  ACTION_DEFINE_ARRAY predicates BEGIN
+                      present
+                      notequipped
+  END
+  LAF fl#gear#test STR_VAR testid item = bow01 cre = korscroo END
+END
 
 WITH_SCOPE BEGIN
   OUTER_SPRINT testid "can equip slings with shields"
