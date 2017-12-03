@@ -292,3 +292,28 @@ WITH_SCOPE BEGIN
       cre = abazigal
   END
 END
+
+WITH_SCOPE BEGIN
+  ACTION_IF FILE_EXISTS_IN_GAME beltsh.itm AND ENGINE_IS bg2ee BEGIN
+    OUTER_SPRINT testid "opcode 319, Shar item and Viconia"
+    LAF fl#gear#test#usable
+      INT_VAR
+        correct_usable = 1
+        correct_available = 4
+      STR_VAR
+        testid
+        item = beltsh
+        cre = viconi16
+    END
+    OUTER_SPRINT testid "opcode 319, Shar item and not Viconia"
+    LAF fl#gear#test#usable
+      INT_VAR
+        correct_usable = 0
+        correct_available = 5
+      STR_VAR
+        testid
+        item = beltsh
+        cre = aerie12
+    END
+  END
+END

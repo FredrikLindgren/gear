@@ -368,6 +368,47 @@ BEGIN
 END
 
 /*
+ * "Returns" arrays of opcodes #319 (EE)
+ * $fl#gear#usable#itm#319#bool
+ * $fl#gear#usable#itm#319#p1
+ * $fl#gear#usable#itm#319#p2
+ * $fl#gear#usable#itm#319#resource
+ * all of the type $array(int) = result
+ */
+DEFINE_PATCH_MACRO fl#gear#usable#itm#319 BEGIN
+  LOCAL_SET _ = 0
+  LOCAL_SET off = 0
+  LOCAL_SET opcode = 0
+  LOCAL_SET p1 = 0
+  LOCAL_SET p2 = 0
+  LOCAL_SET count = 0
+  LOCAL_SPRINT res ""
+
+  CLEAR_ARRAY fl#gear#usable#itm#319#bool
+  CLEAR_ARRAY fl#gear#usable#itm#319#p1
+  CLEAR_ARRAY fl#gear#usable#itm#319#p2
+  CLEAR_ARRAY fl#gear#usable#itm#319#resource
+
+  GET_OFFSET_ARRAY fl#gear#usable#itm#offset_array#319 ITM_V10_GEN_EFFECTS
+  PHP_EACH fl#gear#usable#itm#offset_array#319 AS _ => off BEGIN
+    READ_SHORT off opcode
+    PATCH_IF opcode = 319 BEGIN
+      ++count
+      READ_BYTE off + 0x3 bool
+      READ_LONG off + 0x4 p1
+      READ_LONG off + 0x8 p2
+      SET $fl#gear#usable#itm#319#bool(count) = bool
+      SET $fl#gear#usable#itm#319#p1(count) = p1
+      SET $fl#gear#usable#itm#319#p2(count) = p2
+      PATCH_IF p2 = 11 BEGIN
+        READ_ASCII off + 0x14 res
+        SPRINT $fl#gear#usable#itm#319#resource(count) "%res%"
+      END
+    END
+  END
+END
+
+/*
  * Determines if the specified creature can use the item given by the current
  * buffer. The current buffer obviously needs to be a valid item.
  */
@@ -380,7 +421,8 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#itm
 BEGIN
   LPF fl#gear#itm#slot_range RET lower upper END
   LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
-  // opcode #319 (EE), item EQEFFECT
+  LPM fl#gear#usable#itm#319 // (EE)
+  // item_use.2da (EE)
 
   INNER_ACTION BEGIN
     COPY_EXISTING "%creature%" override
@@ -392,10 +434,75 @@ BEGIN
           available
       END
       LPF fl#gear#cre#unuse RET cre_main = main cre_kit = kit END
+      LPF fl#gear#usable#cre#319 RET usable END
     BUT_ONLY
   END
   usable = (itm_main BAND cre_main) = 0 AND
-           (itm_kit BAND cre_kit) = 0
+           (itm_kit BAND cre_kit) = 0 ? usable : 0
+END
+
+/*
+ * Checks the result of fl#gear#usable#itm#319 against the current buffer
+ * Uses the following arrays from the calling scope
+ * $fl#gear#usable#itm#319#bool
+ * $fl#gear#usable#itm#319#p1
+ * $fl#gear#usable#itm#319#p2
+ * $fl#gear#usable#itm#319#resource
+ */
+DEFINE_PATCH_FUNCTION fl#gear#usable#cre#319
+  RET
+    usable
+BEGIN
+  PHP_EACH fl#gear#usable#itm#319#p1 AS count => p1 BEGIN
+    SET bool = $fl#gear#usable#itm#319#bool(count)
+    SET p2 = $fl#gear#usable#itm#319#p2(count)
+    PATCH_MATCH p2 WITH
+      2 // EA
+      BEGIN SET $usable(count) = BYTE_AT 0x270 = p1 ? bool : NOT bool END
+
+      3 // GENERAL
+      BEGIN SET $usable(count) = BYTE_AT 0x271 = p1 ? bool : NOT bool END
+
+      4 // RACE
+      BEGIN SET $usable(count) = BYTE_AT 0x272 = p1 ? bool : NOT bool END
+
+      5 // CLASS
+      BEGIN SET $usable(count) = BYTE_AT 0x273 = p1 ? bool : NOT bool END
+
+      6 // SPECIFIC
+      BEGIN SET $usable(count) = BYTE_AT 0x274 = p1 ? bool : NOT bool END
+
+      7 // GENDER
+      BEGIN SET $usable(count) = BYTE_AT 0x275 = p1 ? bool : NOT bool END
+
+      8 // ALIGN
+      BEGIN SET $usable(count) = BYTE_AT 0x27b = p1 ? bool : NOT bool END
+
+      9 // KIT
+      BEGIN
+        READ_LONG 0x244 kit
+        PATCH_IF kit != 0x8000 AND kit != 0x4000 BEGIN // WM and Barb
+          kit >>= 16
+        END ELSE kit <<= 16
+        SET $usable(count) = kit = p1 ? bool : NOT bool
+      END
+
+      10 // Name
+      BEGIN SET $usable(count) = LONG_AT 0x008 = p1 ? bool : NOT bool END
+
+      11 // Script name
+      BEGIN
+        SPRINT res $fl#gear#usable#itm#319#resource(count)
+        READ_ASCII 0x280 script_name (20) NULL
+        SET $usable(count) = "%res%" STR_EQ "%script_name%" ? bool : NOT bool
+      END
+      DEFAULT
+    END
+  END
+  usable = 1
+  PHP_EACH usable AS _ => bool BEGIN
+    usable &= bool
+  END
 END
 
 /*
@@ -541,7 +648,7 @@ BEGIN
     COPY_EXISTING "%item%" override
       LPF fl#gear#itm#slot_range RET lower upper END
       LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
-      // opcode #319 (EE), item EQEFFECT
+      LPM fl#gear#usable#itm#319 // (EE)
     BUT_ONLY
   END
 
@@ -553,8 +660,9 @@ BEGIN
       available
   END
   LPF fl#gear#cre#unuse RET cre_main = main cre_kit = kit END
+  LPF fl#gear#usable#cre#319 RET usable END
   usable = (itm_main BAND cre_main) = 0 AND
-           (itm_kit BAND cre_kit) = 0
+           (itm_kit BAND cre_kit) = 0 ? usable : 0
 END
 
 DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //requires %itm_to_give%, %Charge[1-3]%, $itemexcl, $itm_rank, $cursed_item_list
