@@ -14,12 +14,7 @@ DEFINE_ACTION_FUNCTION fl#gear#test
     source = ""
 BEGIN
   PRINT "Running test %testid%"
-  ACTION_IF "%source%" STR_CMP "" BEGIN
-    OUTER_SPRINT srcfile "%source%"
-  END ELSE BEGIN
-    OUTER_SPRINT srcfile "%MOD_FOLDER%/objects/cre/%cre%.cre"
-  END
-  OUTER_SPRINT dstfile ".../fl#gear#test/inlined/test_object/%cre%.cre"
+  LAF fl#gear#test#files STR_VAR cre source RET srcfile dstfile END
   COPY - "%srcfile%"
          "%dstfile%"
     LPF fl#gear
@@ -43,6 +38,55 @@ BEGIN
         dest = EVAL "%cre%.cre"
     END
   END
+END
+
+/* Test for #usable API */
+DEFINE_ACTION_MACRO fl#gear#test#usable#warn BEGIN
+  ACTION_IF usable != correct_usable BEGIN
+    WARN "WARNING: #usable test failed for usable for test %testid%"
+  END
+  ACTION_IF available != correct_available BEGIN
+    WARN "WARNING: #usable test failed for available for test %testid%"
+  END
+END
+
+DEFINE_ACTION_FUNCTION fl#gear#test#usable
+  INT_VAR
+    correct_usable = "-1"
+    correct_available = "-2"
+  STR_VAR
+    testid = ""
+    item = ""
+    source = ""
+    cre = ""
+BEGIN
+  PRINT "Running #usable test %testid%"
+  ACTION_IF "%item%" STR_EQ "" OR
+            "%cre%" STR_EQ ""
+  BEGIN
+    FAIL "Cannot run #usable test without both item and creature"
+  END
+  LAF fl#gear#test#files STR_VAR cre source RET srcfile dstfile END
+  COPY - "%srcfile%" "%dstfile%"
+    LPF fl#gear#usable STR_VAR item RET usable available END
+  LAM fl#gear#test#usable#warn
+  // must also test the item branch, not just the CRE one
+END
+
+DEFINE_ACTION_FUNCTION fl#gear#test#files
+  STR_VAR
+    source = ""
+    cre = ""
+  RET
+    srcfile
+    dstfile
+BEGIN
+  ACTION_IF "%source%" STR_CMP "" BEGIN
+    OUTER_SPRINT srcfile "%source%"
+  END ELSE BEGIN
+    OUTER_SPRINT srcfile "%MOD_FOLDER%/objects/cre/%cre%.cre"
+  END
+  OUTER_SPRINT dstfile ".../fl#gear#test/inlined/test_object/%cre%.cre"
 END
 
 /* Test predicates */

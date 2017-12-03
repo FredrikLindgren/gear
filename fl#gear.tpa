@@ -167,7 +167,8 @@ DEFINE_ACTION_FUNCTION fl#gear#equip
     item = ""
     creature = ""
 BEGIN
-
+  // Proficiency of item
+  // Proficiency of creature
 END
 
 /*
@@ -322,6 +323,7 @@ DEFINE_PATCH_FUNCTION fl#gear#itm#slot_range
   RET
     lower
     upper
+    category
 BEGIN
   PATCH_IF category < 0 BEGIN
     READ_SHORT 0x1c category
@@ -376,14 +378,46 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#itm
     usable
     available
 BEGIN
- // category of item
- // unusabilities of item
- // flags of item
- // determine slot range of item
- // proficiency of item
+  LPF fl#gear#itm#slot_range RET lower upper END
+  LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
+  // opcode #319 (EE), item EQEFFECT
 
- // unusabilities of creature
- // proficiencies of creature
+  INNER_ACTION BEGIN
+    COPY_EXISTING "%creature%" override
+      LPF fl#gear#cre#first_available_slot
+        INT_VAR
+          lower
+          upper
+        RET
+          available
+      END
+      LPF fl#gear#cre#unuse RET cre_main = main cre_kit = kit END
+    BUT_ONLY
+  END
+  usable = (itm_main BAND cre_main) = 0 AND
+           (itm_kit BAND cre_kit) = 0
+END
+
+/*
+ * Returns the first available item slot in the specified range
+ */
+DEFINE_PATCH_FUNCTION fl#gear#cre#first_available_slot
+  INT_VAR
+    lower = "-1"
+    upper = "-1"
+    available = "-1"
+  RET
+    available
+BEGIN
+  available = "-1"
+  READ_LONG 0x2b8 iso
+  FOR (i = lower; i < upper; ++i) BEGIN
+    READ_SSHORT iso + 0x2 * i ref
+    PATCH_IF ref < 0 BEGIN
+      available = i
+      i = upper
+    END
+  END
 END
 
 /*
@@ -401,7 +435,7 @@ BEGIN
   READ_BYTE 0x273 class
   READ_BYTE 0x27b alignment
   main1 = 0 main2 = 0 main3 = 0 main4 = 0
-  kit1 = 0 kit2 = 0 kit3 = 0 kit4 = 0a
+  kit1 = 0 kit2 = 0 kit3 = 0 kit4 = 0
   main1 = alignment = 17 ? 0b00010100 : // LAWFUL_GOOD
           alignment = 33 ? 0b00100100 : // NEUTRAL_GOOD
           alignment = 49 ? 0b00000101 : // CHAOTIC_GOOD
@@ -503,7 +537,24 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#cre
     usable
     available
 BEGIN
+  INNER_ACTION BEGIN
+    COPY_EXISTING "%item%" override
+      LPF fl#gear#itm#slot_range RET lower upper END
+      LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
+      // opcode #319 (EE), item EQEFFECT
+    BUT_ONLY
+  END
 
+  LPF fl#gear#cre#first_available_slot
+    INT_VAR
+      lower
+      upper
+    RET
+      available
+  END
+  LPF fl#gear#cre#unuse RET cre_main = main cre_kit = kit END
+  usable = (itm_main BAND cre_main) = 0 AND
+           (itm_kit BAND cre_kit) = 0
 END
 
 DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //requires %itm_to_give%, %Charge[1-3]%, $itemexcl, $itm_rank, $cursed_item_list

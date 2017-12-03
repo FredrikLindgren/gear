@@ -265,3 +265,30 @@ WITH_SCOPE BEGIN
   END
   LAF fl#gear#test STR_VAR testid item = shld01 cre = abazigal END
 END
+
+/* Test the #usable API */
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "racial restrictions and non-empty inventory"
+  LAF fl#gear#test#usable
+    INT_VAR
+      correct_usable = 0
+      correct_available = 10
+    STR_VAR
+      testid
+      item = hamm06
+      cre = korscroo
+  END
+END
+
+WITH_SCOPE BEGIN
+  OUTER_SPRINT testid "can use but full slot"
+  LAF fl#gear#test#usable
+    INT_VAR
+      correct_usable = 1
+      correct_available = "-1"
+    STR_VAR
+      testid
+      item = belt02
+      cre = abazigal
+  END
+END
