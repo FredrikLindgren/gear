@@ -62,7 +62,8 @@ DEFINE_ACTION_FUNCTION fl#gear#test#usable
 BEGIN
   PRINT "Running #usable test %testid%"
   ACTION_IF "%item%" STR_EQ "" OR
-            "%cre%" STR_EQ ""
+            ("%cre%" STR_EQ "" AND
+             "%source%" STR_EQ "")
   BEGIN
     FAIL "Cannot run #usable test without both item and creature"
   END
