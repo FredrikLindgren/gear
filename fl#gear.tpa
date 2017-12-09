@@ -440,6 +440,17 @@ BEGIN
            (itm_kit BAND cre_kit) = 0 ? usable : 0
 END
 
+DEFINE_PATCH_FUNCTION fl#gear#cre#read_kit
+  RET
+    kit
+BEGIN
+  // The word order is reversed
+  READ_SHORT 0x244 low_word
+  READ_SHORT 0x246 high_word
+  low_word <<= 16
+  kit = low_word + high_word
+END
+
 /*
  * Checks the result of fl#gear#usable#itm#319 against the current buffer
  * Uses the following arrays from the calling scope
@@ -479,10 +490,7 @@ BEGIN
 
       9 // KIT
       BEGIN
-        READ_LONG 0x244 kit
-        PATCH_IF kit != 0x8000 AND kit != 0x4000 BEGIN // WM and Barb
-          kit >>= 16
-        END ELSE kit <<= 16
+        LPF fl#gear#cre#read_kit RET kit END
         SET $usable(count) = kit = p1 ? bool : NOT bool
       END
 
