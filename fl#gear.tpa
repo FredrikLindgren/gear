@@ -422,7 +422,6 @@ BEGIN
   LPF fl#gear#itm#slot_range RET lower upper END
   LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
   LPM fl#gear#usable#itm#319 // (EE)
-  // item_use.2da (EE)
 
   INNER_ACTION BEGIN
     COPY_EXISTING "%creature%" override
