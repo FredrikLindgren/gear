@@ -181,21 +181,21 @@ WITH_SCOPE BEGIN
 END
 
 WITH_SCOPE BEGIN
-  OUTER_SPRINT testid "robe and bracer, no exclusion"
+  OUTER_SPRINT testid "ring and cloak, no exclusion"
   ACTION_DEFINE_ARRAY predicates BEGIN
                       present
                       equipped
   END
-  LAF fl#gear#test STR_VAR testid item = clck12 cre = pbhunt03 END
+  LAF fl#gear#test STR_VAR testid item = ring02 cre = jade3 END
 END
 
 WITH_SCOPE BEGIN
-  OUTER_SPRINT testid "cloak and bracer, exclusion"
+  OUTER_SPRINT testid "ring and cloak, exclusion"
   ACTION_DEFINE_ARRAY predicates BEGIN
                       present
                       notequipped
   END
-  LAF fl#gear#test STR_VAR testid item = clck01 cre = pbhunt03 END
+  LAF fl#gear#test STR_VAR testid item = ring06 cre = jade3 END
 END
 
 WITH_SCOPE BEGIN
@@ -204,17 +204,17 @@ WITH_SCOPE BEGIN
                       present
                       equipped
   END
-  LAF fl#gear#test STR_VAR testid item = brac02 cre = pbhunt03 END
+  LAF fl#gear#test STR_VAR testid item = clck02 cre = jade3 END
 END
 
-/* // Not implemented yet (how is this supposed to work?)
+/* // Not implemented yet
 WITH_SCOPE BEGIN
   OUTER_SPRINT testid "can de-equip exclusion item of different type for better"
   ACTION_DEFINE_ARRAY predicates BEGIN
                       present
                       equipped
   END
-  LAF fl#gear#test STR_VAR testid item = clck02 cre = pbhunt03 END
+  LAF fl#gear#test STR_VAR testid item = ring07 cre = jade3 END
 END
 */
 

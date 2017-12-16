@@ -79,6 +79,17 @@ BEGIN
     LAM fl#gear#setup#array#itemrank
     LAM fl#gear#setup#array#cursed
   END
+  LPF fl#gear#equip
+    INT_VAR
+      force
+      flags
+      charge1
+      charge2
+      charge3
+    STR_VAR
+      item
+  END
+/*
   LPF give_itm_to_cre
     INT_VAR
       f_Equip = equip
@@ -89,6 +100,7 @@ BEGIN
     STR_VAR
       itm_to_give = EVAL "%item%"
   END
+*/
 END
 
 /*
@@ -163,12 +175,27 @@ END
 DEFINE_ACTION_FUNCTION fl#gear#equip
   INT_VAR
     force = 0
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
   STR_VAR
     item = ""
     creature = ""
 BEGIN
-  // Proficiency of item
-  // Proficiency of creature
+  LAF fl#gear#require#cre STR_VAR creature RET creature = file END
+  COPY_EXISTING "%creature%" "override"
+    LPF fl#gear#equip
+      INT_VAR
+        force
+        charge1
+        charge2
+        charge3
+        flags
+      STR_VAR
+        item
+    END
+  BUT_ONLY
 END
 
 /*
@@ -177,10 +204,38 @@ END
 DEFINE_PATCH_FUNCTION fl#gear#equip
   INT_VAR
     force = 0
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
   STR_VAR
     item = ""
 BEGIN
+  LPF fl#gear#signature RET signature END
+  PATCH_MATCH "%signature%" WITH
+    "CRE " WHEN "%item%" STRING_EQUAL_CASE ""
+    BEGIN
+      PATCH_FAIL "ERROR: the patch function fl#gear#equip must receive an item argument"
+    END
 
+    "CRE "
+    BEGIN
+      LPF fl#gear#require#itm STR_VAR item END
+      LPF fl#gear#equip#cre
+        INT_VAR
+          force
+          charge1
+          charge2
+          charge3
+          flags
+        STR_VAR
+          item
+      END
+    END
+
+    DEFAULT
+      PATCH_FAIL "ERROR: the patch function fl#gear#equip was called on an invalid type of buffer: %SOURCE_FILE%"
+  END
 END
 
 /*
@@ -314,38 +369,157 @@ BEGIN
 END
 
 /*
- * Returns the slot range of the item, based on either the specified
- * category or the category read from the current buffer
+ * Returns sundry properties of the specified item
  */
-DEFINE_PATCH_FUNCTION fl#gear#itm#slot_range
-  INT_VAR
-    category = "-1"
+DEFINE_ACTION_FUNCTION fl#gear#itm#properties
+  STR_VAR
+    item = ""
   RET
-    lower
-    upper
+    lower_slot
+    upper_slot
     category
+    flags
+    proficiency
+    ranged_weapon
+    launcher
+    mage_penalty
+    thief_penalty
 BEGIN
-  PATCH_IF category < 0 BEGIN
-    READ_SHORT 0x1c category
+  LAF fl#gear#require#itm STR_VAR item RET item = file END
+  COPY_EXISTING "%item%" override
+    LPF fl#gear#itm#properties
+      RET
+        lower_slot
+        upper_slot
+        category
+        flags
+        proficiency
+        ranged_weapon
+        launcher
+        mage_penalty
+        thief_penalty
+    END
+  BUT_ONLY
+END
+
+/*
+ * Returns sundry properties of the item, read
+ * from the current buffer
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#properties
+  RET
+    lower_slot
+    upper_slot
+    category
+    flags
+    proficiency
+    /* booleans */
+    ranged_weapon
+    launcher
+    mage_penalty
+    thief_penalty
+BEGIN
+  READ_LONG  0x18 flags
+  READ_SHORT 0x1c category
+  PATCH_IF !ENGINE_IS ~bg1 totsc~ BEGIN
+    READ_BYTE 0x31 proficiency
+  END ELSE proficiency = category
+  LPF fl#gear#itm#properties#slot_range
+    INT_VAR
+      category
+    RET
+      lower_slot
+      upper_slot
   END
-  lower = category = 1 ? 6 : category = 2 ? 1 : category = 3 ? 7 :
-          category = 4 ? 8 : category = 6 ? 3 : category = 7 ? 0 :
-          category = 10 ? 4 : category = 12 ? 2 :
-          category = 15 OR category = 27 OR category = 25 OR
-          category = 17 OR category = 23 OR category = 22 OR
-          category = 16 OR category = 30 OR category = 26 OR
-          category = 19 OR category = 20 OR category = 21 OR
-          category = 18 OR category = 29 ? 9 : category = 32 ? 17 :
-          category = 35 ? 18 : 21
-  upper = category = 1 ? 7 : category = 2 ? 2 : category = 3 ? 8 :
-          category = 4 ? 9 : category = 6 ? 4 : category = 7 ? 1 :
-          category = 10 ? 6 : category = 12 ? 3 :
-          category = 15 OR category = 27 OR category = 25 OR
-          category = 17 OR category = 23 OR category = 22 OR
-          category = 16 OR category = 30 OR category = 26 OR
-          category = 19 OR category = 20 OR category = 21 OR
-          category = 18 OR category = 29 ? 13 :
-          category = 32 ? 18 : category = 35 ? 21 : 37
+  LPF fl#gear#itm#properties#check_abilities
+    RET
+      ranged_weapon = ranged
+      launcher
+  END
+  LPF fl#gear#itm#properties#check_effects
+    INT_VAR
+      category
+    RET
+      mage_penalty
+      thief_penalty
+  END
+END
+
+/*
+ * Check extended headers for sundry properties
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#properties#check_abilities
+  RET
+    ranged
+    launcher
+BEGIN
+  ranged = 0
+  launcher = 0
+  READ_LONG 0x64 ao
+  FOR (i = 0; i < SHORT_AT 0x68; ++i) BEGIN
+    READ_BYTE ao + 0x38 * i type
+    ranged = type = 2 OR type = 4 ? 1 : ranged
+    launcher = type = 4 ? 1 : launcher
+  END
+END
+
+/*
+ * Check effects for sundry properties
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#properties#check_effects
+  INT_VAR
+    category = 0
+  RET
+    mage_penalty
+    thief_penalty
+BEGIN
+  mage_penalty = 0
+  thief_penalty = 0
+  PATCH_IF category = 2 OR category = 12 BEGIN // armour or shied
+    READ_LONG 0x6a eo
+    FOR (i = 0; i < SHORT_AT 0x70; ++i) BEGIN
+      READ_SHORT eo + 0x30 * i opcode
+      READ_SLONG eo + 0x30 * i + 0x4 p1
+      READ_SLONG eo + 0x30 * i + 0x8 p2
+      mage_penalty = (opcode = 145 AND p2 = 0) OR // disable mage casting
+                     (opcode = 60 AND p1 >= 40) // miscast magic percent
+                     ? 1 : mage_penalty
+      thief_penalty = (opcode = 144 AND p2 = 0) OR // disable stealth button
+                      (opcode = 275 AND p1 <= "-50") OR // HiS penalty
+                      (opcode = 59 AND p1 <= "-50") // stealth penalty
+                      ? 1 : thief_penalty
+    END
+  END
+END
+
+/*
+ * Returns the slot range of the specified category
+ */
+DEFINE_PATCH_FUNCTION fl#gear#itm#properties#slot_range
+  INT_VAR
+    category = 0
+  RET
+    lower_slot
+    upper_slot
+BEGIN
+  lower_slot = category = 1 ? 6 : category = 2 ? 1 : category = 3 ? 7 :
+               category = 4 ? 8 : category = 6 ? 3 : category = 7 ? 0 :
+               category = 10 ? 4 : category = 12 ? 2 :
+               category = 15 OR category = 27 OR category = 25 OR
+               category = 17 OR category = 23 OR category = 22 OR
+               category = 16 OR category = 30 OR category = 26 OR
+               category = 19 OR category = 20 OR category = 21 OR
+               category = 18 OR category = 29 ? 9 : category = 32 ? 17 :
+               category = 35 ? 18 : 21
+  upper_slot = category = 1 ? 7 : category = 2 ? 2 : category = 3 ? 8 :
+               category = 4 ? 9 : category = 6 ? 4 : category = 7 ? 1 :
+               category = 10 ? 6 : category = 12 ? 3 :
+               category = 15 OR category = 27 OR category = 25 OR
+               category = 17 OR category = 23 OR category = 22 OR
+               category = 16 OR category = 30 OR category = 26 OR
+               category = 19 OR category = 20 OR category = 21 OR
+               category = 18 OR category = 29 ? 13 :
+               category = 32 ? 18 : category = 35 ? 21 : 37
 END
 
 /*
@@ -419,7 +593,7 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#itm
     usable
     available
 BEGIN
-  LPF fl#gear#itm#slot_range RET lower upper END
+  LPF fl#gear#itm#properties RET lower = lower_slot upper = upper_slot END
   LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
   LPM fl#gear#usable#itm#319 // (EE)
 
@@ -637,7 +811,42 @@ BEGIN
   kit3 <<= 16
   kit4 <<= 24
   main = main1 + main2 + main3 + main4
-  kit = main1 + main2 + main3 + main4
+  kit = kit1 + kit2 + kit3 + kit4
+END
+
+/*
+ * Checks if the specified item is affected by item-exclusion
+ */
+DEFINE_PATCH_FUNCTION fl#gear#usable#cre#item_exclusion
+  STR_VAR
+    item = ""
+  RET
+    exclusion
+BEGIN
+  exclusion = 0
+  TO_LOWER item
+  PATCH_IF !fl#gear#setup#array#itemexcl BEGIN
+    INNER_ACTION BEGIN
+      LAM fl#gear#setup#array#itemexcl
+    END
+  END
+  PATCH_IF VARIABLE_IS_SET $fl#gear#itemexcl("%item%") BEGIN
+    READ_LONG 0x2b8 iso
+    READ_LONG 0x2bc io
+    FOR (i = 0; i < 18; ++i) BEGIN
+      READ_SSHORT iso + 0x2 * i ref
+      PATCH_IF ref >= 0 BEGIN
+        READ_ASCII io + ref * 0x14 ei
+        TO_LOWER ei
+        PATCH_IF FILE_EXISTS_IN_GAME "%ei%.itm" AND
+                 VARIABLE_IS_SET $fl#gear#itemexcl("%ei%")
+        BEGIN
+          exclusion = 1
+          i = 37
+        END
+      END
+    END
+  END
 END
 
 /*
@@ -653,7 +862,7 @@ DEFINE_PATCH_FUNCTION fl#gear#usable#cre
 BEGIN
   INNER_ACTION BEGIN
     COPY_EXISTING "%item%" override
-      LPF fl#gear#itm#slot_range RET lower upper END
+      LPF fl#gear#itm#properties RET lower = lower_slot upper = upper_slot END
       LPF fl#gear#itm#unuse RET itm_main = main itm_kit = kit END
       LPM fl#gear#usable#itm#319 // (EE)
     BUT_ONLY
@@ -670,6 +879,490 @@ BEGIN
   LPF fl#gear#usable#cre#319 RET usable END
   usable = (itm_main BAND cre_main) = 0 AND
            (itm_kit BAND cre_kit) = 0 ? usable : 0
+END
+
+/*
+ * General logic for equipping items in an optimised fashion
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#cre
+  INT_VAR
+    force = 0
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
+  STR_VAR
+    item = ""
+BEGIN
+  /* Get properties of existing items */
+  LPM fl#gear#equip#cre#check_items
+  /* Add new item */
+  LPF fl#gear#equip#cre#add_item
+    INT_VAR
+      charge1
+      charge2
+      charge3
+      flags
+    STR_VAR
+      item
+    RET
+      item_index = index
+  END
+  /* Get properties of new item */
+  INNER_ACTION BEGIN
+    LAF fl#gear#itm#properties
+      STR_VAR
+        item
+      RET
+        lower_slot
+        upper_slot
+        category
+        item_flags = flags
+        item_proficiency = proficiency
+        ranged_weapon
+        launcher
+        mage_penalty
+        thief_penalty
+    END
+  END
+  /* Check for more or less hard conflicts */
+  LPF fl#gear#equip#conflicts
+    INT_VAR
+      category
+      item_flags
+      ranged_weapon
+      launcher
+      proficiency = item_proficiency
+      mage_penalty
+      thief_penalty
+    STR_VAR
+      item
+    RET
+      conflict
+  END
+
+  /* Never equip items with conflicts */
+  PATCH_IF !conflict BEGIN
+    PATCH_IF force BEGIN // disregard usability rules
+      LPF fl#gear#equip#forced
+        INT_VAR
+          item_index
+          lower_slot
+          upper_slot
+      END
+    END ELSE BEGIN // play by the usual rules
+      LPF fl#gear#equip#unforced
+        INT_VAR
+          item_index
+        STR_VAR
+          item
+      END
+    END
+  END ELSE BEGIN
+    LPF fl#gear#equip#gen_inv INT_VAR item_index END
+  END
+END
+
+/* Equip an item while considering usability rules,
+ * item exclusion and optimisation
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#unforced
+  INT_VAR
+    item_index = "-1"
+  STR_VAR
+    item = ""
+BEGIN
+  LPF fl#gear#usable STR_VAR item RET usable available END
+  LPF fl#gear#usable#cre#item_exclusion STR_VAR item RET exclusion END
+  PATCH_IF usable AND !exclusion AND available >= 0 BEGIN // slot available
+    LPF fl#gear#equip#cre#write_index
+      INT_VAR
+        slot = available
+        index = item_index
+    END
+  END ELSE PATCH_IF usable AND !exclusion AND available < 0 BEGIN // swap
+    // TBD
+  END ELSE PATCH_IF !usable OR exclusion BEGIN // put in general inventory
+    LPF fl#gear#equip#gen_inv INT_VAR item_index END
+  END
+END
+
+/*
+ * Equip an item without considering usability rules
+ * or optimisation
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#forced
+  INT_VAR
+    item_index = "-1"
+    lower_slot = "-1"
+    upper_slot = "-1"
+BEGIN
+  LPF fl#gear#cre#first_available_slot
+    INT_VAR
+      lower = lower_slot
+      upper = upper_slot
+    RET
+      available
+  END
+  PATCH_IF available >= 0 BEGIN // slot is available
+    LPF fl#gear#equip#cre#write_index
+      INT_VAR
+        slot = available
+        index = item_index
+    END
+  END ELSE BEGIN // no slot available: force swap
+    // TBD
+  END
+END
+
+/*
+ * Write the given item index to the general inventory
+ * Nothing is written if the inventory is full
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#gen_inv
+  INT_VAR
+    item_index = "-1"
+BEGIN
+  LPF fl#gear#cre#first_available_slot
+    INT_VAR
+      lower = 21
+      upper = 37
+    RET
+      available
+  END
+  PATCH_IF available >= 0 BEGIN
+    LPF fl#gear#equip#cre#write_index
+      INT_VAR
+        slot = available
+        index = item_index
+    END
+  END // no slot available in inventory: no reference to item
+END
+
+/*
+ * Creates arrays of properties of items already in the inventory
+ * "Returns" the arrays
+ * fl#gear#equip#array#slot_ref
+ * fl#gear#equip#array#category
+ * fl#gear#equip#array#flags
+ * fl#gear#equip#array#ranged
+ * fl#gear#equip#array#launcher
+ * fl#gear#equip#array#proficiency
+ * the key is the slot index
+ */
+DEFINE_PATCH_MACRO fl#gear#equip#cre#check_items BEGIN
+  LOCAL_SET io = 0
+  LOCAL_SET iso = 0
+  LOCAL_SET i = 0
+  LOCAL_SET ref = 0
+  LOCAL_SET category = 0
+  LOCAL_SET flags = 0
+  LOCAL_SPRINT item ""
+
+  READ_LONG 0x2b8 iso
+  READ_LONG 0x2bc io
+  FOR (i = 0; i < 18; ++i) BEGIN
+    READ_SSHORT iso + 0x2 * i ref
+    SET $fl#gear#equip#array#slot_ref("%i%") = ref
+    PATCH_IF ref >= 0 BEGIN
+      READ_ASCII io + 0x14 * ref item
+      PATCH_IF FILE_EXISTS_IN_GAME "%item%.itm" BEGIN
+        INNER_ACTION BEGIN
+          LAF fl#gear#itm#properties
+            STR_VAR
+              item
+            RET
+              category
+              flags
+              ranged_weapon
+              launcher
+              proficiency
+          END
+        END
+        SET $fl#gear#equip#array#category("%i%") = category
+        SET $fl#gear#equip#array#flags("%i%") = flags
+        SET $fl#gear#equip#array#ranged("%i%") = ranged_weapon
+        SET $fl#gear#equip#array#launcher("%i%") = launcher
+        SET $fl#gear#equip#array#proficiency("%i%") = proficiency
+      END
+    END
+  END
+END
+
+/*
+ * General check for conflicts
+ * Uses the arrays set by
+ * fl#gear#equip#cre#check_items
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflicts
+  INT_VAR
+    category = 0
+    item_flags = 0
+    ranged_weapon = 0
+    launcher = 0
+    proficiency = 0
+    mage_penalty = 0
+    thief_penalty = 0
+  STR_VAR
+    item = ""
+  RET
+    conflict
+    twohanded_conflict
+    launcher_conflict
+    ranged_conflict
+    mage_conflict
+    thief_conflict
+    curse_conflict
+BEGIN
+  LPF fl#gear#equip#conflict#twohanded
+    INT_VAR
+      category
+      item_flags
+    RET
+      twohanded_conflict = conflict
+  END
+  LPF fl#gear#equip#conflict#launcher
+    INT_VAR
+      launcher
+      proficiency
+    RET
+      launcher_conflict = conflict
+  END
+  LPF fl#gear#equip#conflict#ranged_weapons
+    INT_VAR
+      ranged_weapon
+      launcher
+      proficiency
+    RET
+      ranged_conflict = conflict
+  END
+  LPF fl#gear#equip#conflict#mage
+    INT_VAR
+      mage_penalty
+    RET
+      mage_conflict = conflict
+  END
+  LPF fl#gear#equip#conflict#thief
+    INT_VAR
+      thief_penalty
+    RET
+      thief_conflict = conflict
+  END
+  LPF fl#gear#equip#conflict#curse
+    INT_VAR
+      item_flags
+    STR_VAR
+      item
+    RET
+      curse_conflict = conflict
+  END
+  conflict = twohanded_conflict OR
+             launcher_conflict OR
+             ranged_conflict OR
+             mage_conflict OR
+             thief_conflict OR
+             curse_conflict
+END
+
+/*
+ * Checks for launcher conflicts
+ * Cannot equip two launchers of the same type
+ * Uses the following arrays from the calling scope
+ * fl#gear#equip#array#launcher
+ * fl#gear#equip#array#proficiency
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#launcher
+  INT_VAR
+    launcher = 0
+    proficiency = 0
+  RET
+    conflict
+BEGIN
+  conflict = 0
+  PATCH_IF launcher BEGIN
+    FOR (i = 9; i < 13; ++i) BEGIN
+      conflict = VARIABLE_IS_SET $fl#gear#equip#array#launcher("%i%") AND
+                 $fl#gear#equip#array#launcher("%i%") = 1 AND
+                 VARIABLE_IS_SET $fl#gear#equip#array#proficiency("%i%") AND
+                 $fl#gear#equip#array#proficiency("%i%") = proficiency
+                 ? 1 : conflict
+    END
+  END
+END
+
+/*
+ * Checks for ranged-weapon (and sling) conflicts
+ * Can only equip ranged weapons and slings unless there is no off-hand item
+ * or the off-hand item is a shield
+ * Uses the following arrays from the calling scope
+ * fl#gear#equip#array#slot_ref
+ * fl#gear#equip#array#category
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#ranged_weapons
+  INT_VAR
+    ranged_weapon = 0
+    launcher = 0
+    proficiency = 0
+  RET
+    conflict
+BEGIN
+  conflict = 0
+  sling_prof = !ENGINE_IS ~bg1 totsc~ ? 107 : 18
+  PATCH_IF ranged_weapon OR (launcher AND proficiency = sling_prof) BEGIN
+    conflict = $fl#gear#equip#array#slot_ref(2) < 0 OR
+               (VARIABLE_IS_SET $fl#gear#equip#array#category(2) AND
+                $fl#gear#equip#array#category(2) = 12)
+               ? conflict : 1
+  END
+END
+
+/*
+ * Checks for conflicts involving two-handed weapons
+ * Cannot equip two-handed weapons and off-hand items simultaneously
+ * Uses the following arrays from the calling scope
+ * fl#gear#equip#array#slot_ref
+ * fl#gear#equip#array#flags
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#twohanded
+  INT_VAR
+    category = 0
+    item_flags = 0
+  RET
+    conflict
+BEGIN
+  conflict = 0
+  /* Conflict if the item is two-handed or bow and there's something
+   * in the shield slot
+   */
+  conflict = ((item_flags BAND BIT1) = BIT1 OR
+              (item_flags BAND BIT7) = BIT7) AND
+             $fl#gear#equip#array#slot_ref(2) >= 0
+             ? 1 : conflict
+  /* Conflict if the item is a shield and there's a two-handed
+   * weapon or bow equipped
+   */
+  PATCH_IF category = 12 BEGIN
+    FOR (i = 9; i < 13; ++i) BEGIN
+      conflict = VARIABLE_IS_SET $fl#gear#equip#array#flags("%i%") AND
+                 (($fl#gear#equip#array#flags("%i%") BAND BIT1) = BIT1 OR
+                 ($fl#gear#equip#array#flags("%i%") BAND BIT7) = BIT7)
+                 ? 1 : conflict
+    END
+  END
+END
+
+/*
+ * Checks for class conflict: mage
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#mage
+  INT_VAR
+    mage_penalty = 0
+  RET
+    conflict
+BEGIN
+  READ_BYTE 0x273 class
+  conflict = mage_penalty AND
+             (class = 1 OR // MAGE
+              class = 5 OR // BARD
+              class = 7 OR // FIGHTER_MAGE
+              class = 10 OR // FIGHTER_MAGE_THIEF
+              class = 13 OR // MAGE_THIEF
+              class = 14 OR // CLERIC_MAGE
+              class = 17 OR // FIGHTER_MAGE_CLERIC
+              class = 19) // SORCERER
+              ? 1 : 0
+END
+
+/*
+ * Checks for class conflict: thief
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#thief
+  INT_VAR
+    thief_penalty = 0
+  RET
+    conflict
+BEGIN
+  READ_BYTE 0x273 class
+  conflict = thief_penalty AND
+             (class = 4 OR // THIEF
+              class = 5 OR // BARD
+              class = 9 OR // FIGHTER_THIEF
+              class = 10 OR // FIGHTER_MAGE_THIEF
+              class = 13 OR // MAGE_THIEF
+              class = 15) // CLERIC_THIEF
+              ? 1 : 0
+END
+
+/*
+ * Checks for cursed items; do not equip
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#conflict#curse
+  INT_VAR
+    item_flags = 0
+  STR_VAR
+    item = ""
+  RET
+    conflict
+BEGIN
+  TO_LOWER item
+  conflict = (item_flags BAND BIT4) = BIT4 OR
+             VARIABLE_IS_SET $fl#gear#cursed("%item%")
+             ? 1 : 0
+END
+
+/*
+ * Writes a resource reference to the item into the creature's
+ * item list and returns the reference's index
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#cre#add_item
+  INT_VAR
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
+  STR_VAR
+    item = ""
+  RET
+    index
+BEGIN
+  LPF RES_OF_FILESPEC
+    STR_VAR
+      filespec = EVAL "%item%"
+    RET
+      item = res
+  END
+  READ_LONG 0x2bc io
+  READ_LONG 0x2c0 ni
+  io = io < 0x2d4 ? 0x2d4 : io
+  INSERT_BYTES io + 0x14 * ni 0x14
+  WRITE_ASCIIE io + 0x14 * ni "%item%" #8
+  WRITE_SHORT  io + 0x14 * ni + 0xa charge1
+  WRITE_SHORT  io + 0x14 * ni + 0xc charge2
+  WRITE_SHORT  io + 0x14 * ni + 0xe charge3
+  WRITE_BYTE   io + 0x14 * ni + 0x10 flags
+  WRITE_LONG 0x2c0 ni + 1
+  PATCH_FOR_EACH off IN 0x2a8 0x2b0 0x2b8 0x2c4 BEGIN
+    READ_LONG off ov
+    PATCH_IF (ov > io) OR (ov = io AND ni = 0) BEGIN
+      WRITE_LONG off ov + 0x14
+    END
+  END
+  index = ni
+END
+
+/*
+ * Writes the specified item index to the specified item slot
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip#cre#write_index
+  INT_VAR
+    slot = "-1"
+    index = "-1"
+BEGIN
+  PATCH_IF slot = "-1" OR index = "-1" BEGIN
+    PATCH_FAIL "ERROR: the function fl#gear#equip#cre#write_index got invalid arguments"
+  END
+  READ_LONG 0x2b8 iso
+  WRITE_SHORT iso + 0x2 * slot index
 END
 
 DEFINE_PATCH_FUNCTION give_itm_to_cre INT_VAR f_Equip = 1 f_Flags = 0 BEGIN //requires %itm_to_give%, %Charge[1-3]%, $itemexcl, $itm_rank, $cursed_item_list
