@@ -167,78 +167,6 @@ BEGIN
 END
 
 /*
- * Attempts to equip the specified creature with the specified item in an
- * optimised fashion, considering skill, class and kit, available item slots,
- * existing equipment and other factors. Boolean force equips the item
- * regardless.
- */
-DEFINE_ACTION_FUNCTION fl#gear#equip
-  INT_VAR
-    force = 0
-    charge1 = 0
-    charge2 = 0
-    charge3 = 0
-    flags = 0
-  STR_VAR
-    item = ""
-    creature = ""
-BEGIN
-  LAF fl#gear#require#cre STR_VAR creature RET creature = file END
-  COPY_EXISTING "%creature%" "override"
-    LPF fl#gear#equip
-      INT_VAR
-        force
-        charge1
-        charge2
-        charge3
-        flags
-      STR_VAR
-        item
-    END
-  BUT_ONLY
-END
-
-/*
- * As the action function, except the current buffer must be a valid creature.
- */
-DEFINE_PATCH_FUNCTION fl#gear#equip
-  INT_VAR
-    force = 0
-    charge1 = 0
-    charge2 = 0
-    charge3 = 0
-    flags = 0
-  STR_VAR
-    item = ""
-BEGIN
-  LPF fl#gear#signature RET signature END
-  PATCH_MATCH "%signature%" WITH
-    "CRE " WHEN "%item%" STRING_EQUAL_CASE ""
-    BEGIN
-      PATCH_FAIL "ERROR: the patch function fl#gear#equip must receive an item argument"
-    END
-
-    "CRE "
-    BEGIN
-      LPF fl#gear#require#itm STR_VAR item END
-      LPF fl#gear#equip#cre
-        INT_VAR
-          force
-          charge1
-          charge2
-          charge3
-          flags
-        STR_VAR
-          item
-      END
-    END
-
-    DEFAULT
-      PATCH_FAIL "ERROR: the patch function fl#gear#equip was called on an invalid type of buffer: %SOURCE_FILE%"
-  END
-END
-
-/*
  * Setup macro to create the item-exclusion array
  */
 DEFINE_ACTION_MACRO fl#gear#setup#array#itemexcl BEGIN
@@ -879,6 +807,78 @@ BEGIN
   LPF fl#gear#usable#cre#319 RET usable END
   usable = (itm_main BAND cre_main) = 0 AND
            (itm_kit BAND cre_kit) = 0 ? usable : 0
+END
+
+/*
+ * Attempts to equip the specified creature with the specified item in an
+ * optimised fashion, considering skill, class and kit, available item slots,
+ * existing equipment and other factors. Boolean force equips the item
+ * regardless.
+ */
+DEFINE_ACTION_FUNCTION fl#gear#equip
+  INT_VAR
+    force = 0
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
+  STR_VAR
+    item = ""
+    creature = ""
+BEGIN
+  LAF fl#gear#require#cre STR_VAR creature RET creature = file END
+  COPY_EXISTING "%creature%" "override"
+    LPF fl#gear#equip
+      INT_VAR
+        force
+        charge1
+        charge2
+        charge3
+        flags
+      STR_VAR
+        item
+    END
+  BUT_ONLY
+END
+
+/*
+ * As the action function, except the current buffer must be a valid creature.
+ */
+DEFINE_PATCH_FUNCTION fl#gear#equip
+  INT_VAR
+    force = 0
+    charge1 = 0
+    charge2 = 0
+    charge3 = 0
+    flags = 0
+  STR_VAR
+    item = ""
+BEGIN
+  LPF fl#gear#signature RET signature END
+  PATCH_MATCH "%signature%" WITH
+    "CRE " WHEN "%item%" STRING_EQUAL_CASE ""
+    BEGIN
+      PATCH_FAIL "ERROR: the patch function fl#gear#equip must receive an item argument"
+    END
+
+    "CRE "
+    BEGIN
+      LPF fl#gear#require#itm STR_VAR item END
+      LPF fl#gear#equip#cre
+        INT_VAR
+          force
+          charge1
+          charge2
+          charge3
+          flags
+        STR_VAR
+          item
+      END
+    END
+
+    DEFAULT
+      PATCH_FAIL "ERROR: the patch function fl#gear#equip was called on an invalid type of buffer: %SOURCE_FILE%"
+  END
 END
 
 /*
