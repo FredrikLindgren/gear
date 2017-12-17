@@ -451,7 +451,7 @@ BEGIN
 END
 
 /*
- * Returns the items unusability bytes as two DWORDs
+ * Returns the item's unusability bytes as two DWORDs
  */
 DEFINE_PATCH_FUNCTION fl#gear#itm#unuse
   RET
