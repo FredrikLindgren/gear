@@ -602,7 +602,7 @@ BEGIN
       11 // Script name
       BEGIN
         SPRINT res $fl#gear#usable#itm#319#resource(count)
-        READ_ASCII 0x280 script_name (20) NULL
+        READ_ASCII 0x280 script_name (32) NULL
         SET $usable(count) = "%res%" STR_EQ "%script_name%" ? bool : NOT bool
       END
       DEFAULT
