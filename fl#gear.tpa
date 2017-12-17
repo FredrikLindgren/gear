@@ -81,6 +81,7 @@ BEGIN
   END
   LPF fl#gear#equip
     INT_VAR
+      equip
       force
       flags
       charge1
@@ -817,6 +818,7 @@ END
  */
 DEFINE_ACTION_FUNCTION fl#gear#equip
   INT_VAR
+    equip = 1
     force = 0
     charge1 = 0
     charge2 = 0
@@ -830,6 +832,7 @@ BEGIN
   COPY_EXISTING "%creature%" "override"
     LPF fl#gear#equip
       INT_VAR
+        equip
         force
         charge1
         charge2
@@ -846,6 +849,7 @@ END
  */
 DEFINE_PATCH_FUNCTION fl#gear#equip
   INT_VAR
+    equip = 1
     force = 0
     charge1 = 0
     charge2 = 0
@@ -866,6 +870,7 @@ BEGIN
       LPF fl#gear#require#itm STR_VAR item END
       LPF fl#gear#equip#cre
         INT_VAR
+          equip
           force
           charge1
           charge2
@@ -886,6 +891,7 @@ END
  */
 DEFINE_PATCH_FUNCTION fl#gear#equip#cre
   INT_VAR
+    equip = 1
     force = 0
     charge1 = 0
     charge2 = 0
@@ -942,7 +948,7 @@ BEGIN
   END
 
   /* Never equip items with conflicts */
-  PATCH_IF !conflict BEGIN
+  PATCH_IF !conflict AND equip BEGIN
     PATCH_IF force BEGIN // disregard usability rules
       LPF fl#gear#equip#forced
         INT_VAR
