@@ -814,7 +814,7 @@ END
  * Attempts to equip the specified creature with the specified item in an
  * optimised fashion, considering skill, class and kit, available item slots,
  * existing equipment and other factors. Boolean force equips the item
- * regardless.
+ * regardless of existing equipment.
  */
 DEFINE_ACTION_FUNCTION fl#gear#equip
   INT_VAR
@@ -949,20 +949,12 @@ BEGIN
 
   /* Never equip items with conflicts */
   PATCH_IF !conflict AND equip BEGIN
-    PATCH_IF force BEGIN // disregard usability rules
-      LPF fl#gear#equip#forced
-        INT_VAR
-          item_index
-          lower_slot
-          upper_slot
-      END
-    END ELSE BEGIN // play by the usual rules
-      LPF fl#gear#equip#unforced
-        INT_VAR
-          item_index
-        STR_VAR
-          item
-      END
+    LPF fl#gear#equip#equip
+      INT_VAR
+        item_index
+        force
+      STR_VAR
+        item
     END
   END ELSE BEGIN
     LPF fl#gear#equip#gen_inv INT_VAR item_index END
@@ -972,9 +964,10 @@ END
 /* Equip an item while considering usability rules,
  * item exclusion and optimisation
  */
-DEFINE_PATCH_FUNCTION fl#gear#equip#unforced
+DEFINE_PATCH_FUNCTION fl#gear#equip#equip
   INT_VAR
     item_index = "-1"
+    force = 0
   STR_VAR
     item = ""
 BEGIN
@@ -990,34 +983,6 @@ BEGIN
     // TBD
   END ELSE PATCH_IF !usable OR exclusion BEGIN // put in general inventory
     LPF fl#gear#equip#gen_inv INT_VAR item_index END
-  END
-END
-
-/*
- * Equip an item without considering usability rules
- * or optimisation
- */
-DEFINE_PATCH_FUNCTION fl#gear#equip#forced
-  INT_VAR
-    item_index = "-1"
-    lower_slot = "-1"
-    upper_slot = "-1"
-BEGIN
-  LPF fl#gear#cre#first_available_slot
-    INT_VAR
-      lower = lower_slot
-      upper = upper_slot
-    RET
-      available
-  END
-  PATCH_IF available >= 0 BEGIN // slot is available
-    LPF fl#gear#equip#cre#write_index
-      INT_VAR
-        slot = available
-        index = item_index
-    END
-  END ELSE BEGIN // no slot available: force swap
-    // TBD
   END
 END
 
