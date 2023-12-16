@@ -10,10 +10,14 @@ ALWAYS
   OUTER_SET BG1 = 0
   OUTER_SET Tutu = 0
   OUTER_SET BGT = 0
+
+  // Standardise ITEMEXCL.2DA to a known quantity
+  ACTION_IF 1 BEGIN
+    COPY ~%MOD_FOLDER%/rules/itemexcl/tob/itemexcl.2da~ override
+  END
 END
 
 BEGIN ~fl#gear test battery~
-NO_LOG_RECORD
 
 /* Abide by restrictions on class, alignment, race, kit */
 WITH_SCOPE BEGIN
